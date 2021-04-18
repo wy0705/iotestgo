@@ -1,0 +1,42 @@
+html/template针对的是需要返回HTML内容的场景，
+在模板渲染过程中会对一些有风险的内容进行转义，以此来防范跨站脚本攻击。
+
+例如，我定义下面的模板文件：
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Hello</title>
+</head>
+<body>
+    {{.}}
+</body>
+</html>
+这个时候传入一段JS代码并使用html/template去渲染该文件，
+会在页面上显示出转义后的JS内容。 <script>alert('xxx')</script>
+这就是html/template为我们做的事。
+
+但是在某些场景下，我们如果相信用户输入的内容，不想转义的话，
+可以自行编写一个safe函数，手动返回一个template.HTML类型的内容。示例如下：
+
+func xss(w http.ResponseWriter, r *http.Request){
+	tmpl,err := template.New("xss.tmpl").Funcs(template.FuncMap{
+		"safe": func(s string)template.HTML {
+			return template.HTML(s)
+		},
+	}).ParseFiles("./xss.tmpl")
+	if err != nil {
+		fmt.Println("create template failed, err:", err)
+		return
+	}
+	jsStr := `<script>alert('xxx')</script>`
+	err = tmpl.Execute(w, jsStr)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+这样我们只需要在模板文件不需要转义的内容后面使用我们定义好的safe函数就可以了。
+{{ . | safe }}
